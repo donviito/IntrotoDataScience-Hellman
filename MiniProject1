@@ -1,0 +1,107 @@
+from bs4 import BeautifulSoup
+import pandas as pd
+import requests
+import matplotlib.pyplot as plt
+import re
+
+page = 1
+recipes = []
+
+while page < 31: #Scraping the data
+    url = f"https://www.skinnytaste.com/page/{page}"
+    response = requests.get(url)
+    skinny = response.content
+    soup = BeautifulSoup(skinny, "lxml")
+
+    for i in soup.find_all('article', class_='post teaser-post odd'): #Gathering the information needed
+        recipe = {}
+        recipe["title"] = i.h2.get_text(strip=True)
+
+
+        image = i.find('img') #Reading the thumbnails in order to find the colour points
+        image_url = (image["src"])
+
+        try: #Saving colour points if a value exists. If no value is found, -1 is returned.
+            recipe["greenPoint"] = int(i.find("span", {"class": "smart-points green"}).get_text())
+            recipe["bluePoint"] = int(i.find("span", {"class": "smart-points blue"}).get_text())
+            recipe["purplePoint"] = int(i.find("span", {"class": "smart-points purple"}).get_text())
+
+        except AttributeError:
+            recipe["greenPoint"] = -1
+            recipe["bluePoint"] = -1
+            recipe["purplePoint"] = -1
+
+        try: #Finding the calories for each recipe, if no calories are found and empty string is returned.
+            cal = (i.find("span", class_= 'recipe-meta-value value-calories divider-right').get_text())
+            recipe["cal"] = re.sub("[^0-9]", "", cal) #Only keeping Integer values
+
+        except AttributeError:
+            recipe["cal"] = ""
+
+        summary = i.find('p', class_='excerpt').get_text() #Finding the summary.
+
+        recipeKeys = [] #Gathering the different recipe keys for each recipe and saving it into a list.
+                 #
+        icons = i.find("div", {"class": "post-meta"})
+        key = icons.findAll("img")
+        for i in key:
+           recipeKeys.append(i["alt"])
+        recipe["keys"] = list(dict.fromkeys(recipeKeys)) #Removing possible duplicates
+        recipes.append(recipe)
+
+    page = page + 1
+
+df = pd.DataFrame(recipes) #Creating the data frame to visualise the data
+
+
+df["greenPoint"] = pd.to_numeric(df["greenPoint"]) #Changing the values to numeric in order to create the graphs.
+df["bluePoint"] = pd.to_numeric(df["bluePoint"])
+df["purplePoint"] = pd.to_numeric(df["purplePoint"])
+df["cal"] = pd.to_numeric(df["cal"])
+
+df["bluePoint"].hist(bins=50,color="blue") #Creating the graphs.
+plt.title("Blue point distribution")
+plt.xlabel("Blue points")
+plt.ylabel("Recepies")
+plt.show()
+
+df["greenPoint"].hist(bins=50,color="green")
+plt.title("Green point distribution")
+plt.xlabel("Green points")
+plt.ylabel("Recepies")
+plt.show()
+
+df["purplePoint"].hist(bins=50,color="purple")
+plt.title("Purple point distribution")
+plt.xlabel("Purple points")
+plt.ylabel("Recepies")
+plt.show()
+
+df["cal"].hist(bins=50,color="red")
+plt.title("Calorie distribution")
+plt.xlabel("Calories")
+plt.ylabel("Recepies")
+plt.show()
+
+df["keys"].value_counts().plot(kind = "bar")
+plt.title("Recipe keys")
+plt.xlabel("")
+plt.show()
+
+
+#With the following chunk of code I tried to create a filtering based on user input.
+#Due to the time limit I wasn't able to finish it.
+
+
+#def filter(minCals, maxCals):
+ #   filteredRecipes = []
+  #  for i in recipes:
+   #  if(recipes["cal"] <= minCals and recipes["cal"] <= maxCals):
+    #      filteredRecipes.append(i)
+     #     if(len(filteredRecipes) == 5):
+      #       return filteredRecipes
+
+
+#minCals = 100
+#maxCals = 250
+#filter(minCals,maxCals)
